@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"time"
@@ -45,9 +46,16 @@ func (s *Server) routes() http.Handler {
 
 	return mux
 }
-
 func (s *Server) handleRequest(w http.ResponseWriter, r *http.Request) {
-
+	if r.Body != nil {
+		defer r.Body.Close()
+		body, _ := io.ReadAll(r.Body)
+		s.logger.Info("received request",
+			"headers", r.Header,
+			"body", string(body),
+		)
+	}
+	w.WriteHeader(http.StatusOK)
 }
 
 func (s *Server) Start(ctx context.Context) error {
