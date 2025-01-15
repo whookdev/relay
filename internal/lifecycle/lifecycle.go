@@ -72,7 +72,7 @@ func (lc *Lifecycle) MaintainRegistration(ctx context.Context) chan struct{} {
 
 	go func() {
 		defer close(done)
-		ticker := time.NewTicker(15 * time.Second)
+		ticker := time.NewTicker(time.Duration(lc.cfg.HeartbeatInterval) * time.Second)
 		defer ticker.Stop()
 
 		if err := lc.updateHeartbeat(); err != nil {
@@ -87,12 +87,6 @@ func (lc *Lifecycle) MaintainRegistration(ctx context.Context) chan struct{} {
 					lc.logger.Error("failed heartbeat", "error", err)
 				}
 			case <-ctx.Done():
-				lc.logger.Info("context cancelled, cleaning up relay registration")
-				if err := lc.deregisterFromConductor(); err != nil {
-					lc.logger.Error("failed to de-register from conductor", "error", err)
-				} else {
-					lc.logger.Info("de-registered from conductor")
-				}
 				lc.logger.Info("heartbeat routine stopped")
 				return
 			}
@@ -100,16 +94,6 @@ func (lc *Lifecycle) MaintainRegistration(ctx context.Context) chan struct{} {
 	}()
 
 	return done
-}
-
-func (lc *Lifecycle) deregisterFromConductor() error {
-	result := lc.rdb.HDel(context.Background(),
-		lc.cfg.RegistryKey,
-		lc.cfg.ServerID)
-	if err := result.Err(); err != nil {
-		return fmt.Errorf("failed to de-register from conductor: %w", err)
-	}
-	return nil
 }
 
 func (lc *Lifecycle) updateHeartbeat() error {

@@ -18,7 +18,7 @@ type Config struct {
 
 	WSPort int
 
-	HealthCheckInterval int
+	HeartbeatInterval int
 }
 
 func NewConfig() (*Config, error) {
@@ -34,13 +34,13 @@ func NewConfig() (*Config, error) {
 	}
 
 	return &Config{
-		Port:                port,
-		Host:                getEnvWithDefault("HOST", "0.0.0.0"),
-		ServerID:            requireEnv("SERVER_ID"),
-		RedisURL:            requireEnv("REDIS_URL"),
-		RegistryKey:         getEnvWithDefault("REGISTRY_KEY", "relay_servers"),
-		WSPort:              wsPort,
-		HealthCheckInterval: 30,
+		Port:              port,
+		Host:              getEnvWithDefault("HOST", "0.0.0.0"),
+		ServerID:          requireEnv("SERVER_ID"),
+		RedisURL:          requireEnv("REDIS_URL"),
+		RegistryKey:       getEnvWithDefault("REGISTRY_KEY", "relay_servers"),
+		WSPort:            wsPort,
+		HeartbeatInterval: 15,
 	}, nil
 }
 
