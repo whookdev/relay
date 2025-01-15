@@ -13,7 +13,8 @@ type Config struct {
 	Host     string
 	ServerID string
 
-	RedisURL string
+	RedisURL    string
+	RegistryKey string
 
 	WSPort int
 
@@ -37,6 +38,7 @@ func NewConfig() (*Config, error) {
 		Host:                getEnvWithDefault("HOST", "0.0.0.0"),
 		ServerID:            requireEnv("SERVER_ID"),
 		RedisURL:            requireEnv("REDIS_URL"),
+		RegistryKey:         getEnvWithDefault("REGISTRY_KEY", "relay_servers"),
 		WSPort:              wsPort,
 		HealthCheckInterval: 30,
 	}, nil

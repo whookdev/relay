@@ -20,6 +20,7 @@ type Lifecycle struct {
 type ServerInfo struct {
 	Load          int       `json:"load"`
 	LastHeartbeat time.Time `json:"last_heartbeat"`
+	RelayUrl      string    `json:"relay_url"`
 }
 
 func New(cfg *config.Config, redis *redis.Client, logger *slog.Logger) (*Lifecycle, error) {
@@ -45,6 +46,7 @@ func (lc *Lifecycle) RegisterWithConductor() error {
 	info := &ServerInfo{
 		Load:          0,
 		LastHeartbeat: time.Now(),
+		RelayUrl:      fmt.Sprintf("%s:%d", lc.cfg.Host, lc.cfg.Port),
 	}
 
 	val, err := json.Marshal(info)
@@ -53,7 +55,7 @@ func (lc *Lifecycle) RegisterWithConductor() error {
 	}
 
 	result := lc.rdb.HSet(context.Background(),
-		"tunnel_servers",
+		lc.cfg.RegistryKey,
 		lc.cfg.ServerID,
 		string(val),
 	)
@@ -85,7 +87,7 @@ func (lc *Lifecycle) MaintainRegistration(ctx context.Context) chan struct{} {
 					lc.logger.Error("failed heartbeat", "error", err)
 				}
 			case <-ctx.Done():
-				lc.logger.Info("context cancelled, cleaning up tunnel registration")
+				lc.logger.Info("context cancelled, cleaning up relay registration")
 				if err := lc.deregisterFromConductor(); err != nil {
 					lc.logger.Error("failed to de-register from conductor", "error", err)
 				} else {
@@ -102,7 +104,7 @@ func (lc *Lifecycle) MaintainRegistration(ctx context.Context) chan struct{} {
 
 func (lc *Lifecycle) deregisterFromConductor() error {
 	result := lc.rdb.HDel(context.Background(),
-		"tunnel_servers",
+		lc.cfg.RegistryKey,
 		lc.cfg.ServerID)
 	if err := result.Err(); err != nil {
 		return fmt.Errorf("failed to de-register from conductor: %w", err)
@@ -114,6 +116,7 @@ func (lc *Lifecycle) updateHeartbeat() error {
 	info := &ServerInfo{
 		Load:          0,
 		LastHeartbeat: time.Now(),
+		RelayUrl:      fmt.Sprintf("%s:%d", lc.cfg.Host, lc.cfg.Port),
 	}
 
 	val, err := json.Marshal(info)
@@ -122,7 +125,7 @@ func (lc *Lifecycle) updateHeartbeat() error {
 	}
 
 	result := lc.rdb.HSet(context.Background(),
-		"tunnel_servers",
+		lc.cfg.RegistryKey,
 		lc.cfg.ServerID,
 		string(val),
 	)
