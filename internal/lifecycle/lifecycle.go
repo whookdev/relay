@@ -9,12 +9,14 @@ import (
 
 	"github.com/redis/go-redis/v9"
 	"github.com/whookdev/relay/internal/config"
+	"github.com/whookdev/relay/internal/util"
 )
 
 type Lifecycle struct {
-	cfg    *config.Config
-	logger *slog.Logger
-	rdb    *redis.Client
+	cfg      *config.Config
+	logger   *slog.Logger
+	rdb      *redis.Client
+	serverId string
 }
 
 type ServerInfo struct {
@@ -34,9 +36,10 @@ func New(cfg *config.Config, redis *redis.Client, logger *slog.Logger) (*Lifecyc
 	logger = logger.With("component", "lifecycle")
 
 	lc := &Lifecycle{
-		cfg:    cfg,
-		rdb:    redis,
-		logger: logger,
+		cfg:      cfg,
+		rdb:      redis,
+		logger:   logger,
+		serverId: fmt.Sprintf("%s-%s", cfg.ServerPrefix, util.GenerateRandomString(4)),
 	}
 
 	return lc, nil
@@ -56,7 +59,7 @@ func (lc *Lifecycle) RegisterWithConductor() error {
 
 	result := lc.rdb.HSet(context.Background(),
 		lc.cfg.RegistryKey,
-		lc.cfg.ServerID,
+		lc.cfg.ServerPrefix,
 		string(val),
 	)
 	if err := result.Err(); err != nil {
@@ -110,13 +113,13 @@ func (lc *Lifecycle) updateHeartbeat() error {
 
 	result := lc.rdb.HSet(context.Background(),
 		lc.cfg.RegistryKey,
-		lc.cfg.ServerID,
+		lc.serverId,
 		string(val),
 	)
 	if err := result.Err(); err != nil {
 		return fmt.Errorf("failed to update heartbeat: %w", err)
 	}
 
-	lc.logger.Debug("heartbeat update", "server_id", lc.cfg.ServerID, "info", info)
+	lc.logger.Debug("heartbeat update", "server_id", lc.serverId, "info", info)
 	return nil
 }

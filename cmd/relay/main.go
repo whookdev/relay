@@ -24,8 +24,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	logger = logger.With("server_id", cfg.ServerID)
-
 	rdb, err := redis.New(cfg, logger)
 	if err != nil {
 		logger.Error("failed to create redis client", "error", err)

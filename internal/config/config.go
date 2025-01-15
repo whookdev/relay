@@ -9,9 +9,9 @@ import (
 )
 
 type Config struct {
-	Port     int
-	Host     string
-	ServerID string
+	Port         int
+	Host         string
+	ServerPrefix string
 
 	RedisURL    string
 	RegistryKey string
@@ -36,7 +36,7 @@ func NewConfig() (*Config, error) {
 	return &Config{
 		Port:              port,
 		Host:              getEnvWithDefault("HOST", "0.0.0.0"),
-		ServerID:          requireEnv("SERVER_ID"),
+		ServerPrefix:      getEnvWithDefault("SERVER_PREFIX", "relay"),
 		RedisURL:          requireEnv("REDIS_URL"),
 		RegistryKey:       getEnvWithDefault("REGISTRY_KEY", "relay_servers"),
 		WSPort:            wsPort,
