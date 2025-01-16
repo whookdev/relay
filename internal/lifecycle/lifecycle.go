@@ -22,7 +22,7 @@ type Lifecycle struct {
 type ServerInfo struct {
 	Load          int       `json:"load"`
 	LastHeartbeat time.Time `json:"last_heartbeat"`
-	RelayUrl      string    `json:"relay_url"`
+	RelayWSUrl    string    `json:"relay_ws_url"`
 }
 
 func New(cfg *config.Config, redis *redis.Client, logger *slog.Logger) (*Lifecycle, error) {
@@ -49,7 +49,7 @@ func (lc *Lifecycle) RegisterWithConductor() error {
 	info := &ServerInfo{
 		Load:          0,
 		LastHeartbeat: time.Now(),
-		RelayUrl:      fmt.Sprintf("%s:%d", lc.cfg.Host, lc.cfg.Port),
+		RelayWSUrl:    fmt.Sprintf("%s:%d", lc.cfg.Host, lc.cfg.WSPort),
 	}
 
 	val, err := json.Marshal(info)
@@ -103,7 +103,7 @@ func (lc *Lifecycle) updateHeartbeat() error {
 	info := &ServerInfo{
 		Load:          0,
 		LastHeartbeat: time.Now(),
-		RelayUrl:      fmt.Sprintf("%s:%d", lc.cfg.Host, lc.cfg.Port),
+		RelayWSUrl:    fmt.Sprintf("%s:%d", lc.cfg.Host, lc.cfg.WSPort),
 	}
 
 	val, err := json.Marshal(info)
