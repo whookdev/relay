@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -18,16 +19,21 @@ func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 	slog.SetDefault(logger)
 
+	if err := initiateApp(logger); err != nil {
+		logger.Error("error in app lifecycle", "error", err)
+		os.Exit(1)
+	}
+}
+
+func initiateApp(logger *slog.Logger) error {
 	cfg, err := config.NewConfig()
 	if err != nil {
-		logger.Error("failed to load configuration", "error", err)
-		os.Exit(1)
+		return fmt.Errorf("loading configuration: %w", err)
 	}
 
 	rdb, err := redis.New(cfg, logger)
 	if err != nil {
-		logger.Error("failed to create redis client", "error", err)
-		os.Exit(1)
+		return fmt.Errorf("creating redis client: %w", err)
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -43,32 +49,27 @@ func main() {
 	}()
 
 	if err := rdb.Start(ctx); err != nil {
-		logger.Error("unable to connect to redis server", "error", err)
-		os.Exit(1)
+		return fmt.Errorf("connecting to redis server: %w", err)
 	}
 
 	lc, err := lifecycle.New(cfg, rdb.Client, logger)
 	if err != nil {
-		logger.Error("failed to create tunnel coordinator", "error", err)
-		os.Exit(1)
+		return fmt.Errorf("creating lifecycle: %w", err)
 	}
 
 	if err = lc.RegisterWithConductor(); err != nil {
-		logger.Error("failed to register with conductor", "error", err)
-		os.Exit(1)
+		return fmt.Errorf("registering with conductor: %w", err)
 	}
 
 	go lc.MaintainRegistration(ctx)
 
 	srv, err := server.New(cfg, logger)
 	if err != nil {
-		logger.Error("failed to create server", "error", err)
-		os.Exit(1)
+		return fmt.Errorf("creating server: %w", err)
 	}
 
 	if err := srv.Start(ctx); err != nil {
-		logger.Error("server error", "error", err)
-		os.Exit(1)
+		return fmt.Errorf("starting server: %w", err)
 	}
 
 	<-ctx.Done()
@@ -94,5 +95,5 @@ func main() {
 		logger.Error("error stopping redis", "error", err)
 	}
 
-	logger.Info("shutdown complete")
+	return nil
 }

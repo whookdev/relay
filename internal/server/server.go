@@ -117,6 +117,7 @@ func (s *Server) handleProxyRequest(w http.ResponseWriter, r *http.Request) {
 	projectID := r.URL.Query().Get("project")
 	if projectID == "" {
 		http.Error(w, "no project id specified", http.StatusBadRequest)
+		return
 	}
 
 	s.tunnelsMux.Lock()
