@@ -22,6 +22,7 @@ type Lifecycle struct {
 type ServerInfo struct {
 	Load          int       `json:"load"`
 	LastHeartbeat time.Time `json:"last_heartbeat"`
+	RelayURL      string    `json:"relay_url"`
 	RelayWSUrl    string    `json:"relay_ws_url"`
 }
 
@@ -49,6 +50,7 @@ func (lc *Lifecycle) RegisterWithConductor() error {
 	info := &ServerInfo{
 		Load:          0,
 		LastHeartbeat: time.Now(),
+		RelayURL:      fmt.Sprintf("%s:%d", lc.cfg.Host, lc.cfg.Port),
 		RelayWSUrl:    fmt.Sprintf("%s:%d", lc.cfg.Host, lc.cfg.WSPort),
 	}
 
@@ -59,7 +61,7 @@ func (lc *Lifecycle) RegisterWithConductor() error {
 
 	result := lc.rdb.HSet(context.Background(),
 		lc.cfg.RegistryKey,
-		lc.cfg.ServerPrefix,
+		lc.serverId,
 		string(val),
 	)
 	if err := result.Err(); err != nil {
@@ -75,7 +77,7 @@ func (lc *Lifecycle) MaintainRegistration(ctx context.Context) chan struct{} {
 
 	go func() {
 		defer close(done)
-		ticker := time.NewTicker(time.Duration(lc.cfg.HeartbeatInterval) * time.Second)
+		ticker := time.NewTicker(15 * time.Second)
 		defer ticker.Stop()
 
 		if err := lc.updateHeartbeat(); err != nil {
@@ -103,6 +105,7 @@ func (lc *Lifecycle) updateHeartbeat() error {
 	info := &ServerInfo{
 		Load:          0,
 		LastHeartbeat: time.Now(),
+		RelayURL:      fmt.Sprintf("%s:%d", lc.cfg.Host, lc.cfg.Port),
 		RelayWSUrl:    fmt.Sprintf("%s:%d", lc.cfg.Host, lc.cfg.WSPort),
 	}
 
