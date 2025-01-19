@@ -2,6 +2,7 @@ package tunnel
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
@@ -71,6 +72,8 @@ func (t *Connection) Handle() error {
 func (t *Connection) ForwardRequest(r *http.Request) (*http.Response, error) {
 	requestID := generateRequestID()
 
+	t.logger.Info("attempting to forward request", "request_id", requestID)
+
 	responseChan := make(chan *models.Message, 1)
 
 	t.pendingMu.Lock()
@@ -91,13 +94,17 @@ func (t *Connection) ForwardRequest(r *http.Request) (*http.Response, error) {
 		Headers:   r.Header,
 	}
 
+	// TODO: Body is always non-nil
 	if r.Body != nil {
+		// TODO: Consider streams
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
 			return nil, fmt.Errorf("reading request body: %w", err)
 		}
-		msg.Body = body
+		msg.Body = json.RawMessage(body)
 	}
+
+	t.logger.Info("attempting to send message", "message", msg)
 
 	if err := t.conn.WriteJSON(msg); err != nil {
 		return nil, fmt.Errorf("sending request: %w", err)
@@ -107,7 +114,8 @@ func (t *Connection) ForwardRequest(r *http.Request) (*http.Response, error) {
 	case resp := <-responseChan:
 		return createHTTPResponse(resp)
 	case <-time.After(30 * time.Second):
-		return nil, fmt.Errorf("timeout waiting for response")
+		t.logger.Error("timeout waiting for response")
+		return createHTTPResponse(msg)
 	case <-t.done:
 		return nil, fmt.Errorf("tunnel closed")
 	}
@@ -115,11 +123,15 @@ func (t *Connection) ForwardRequest(r *http.Request) (*http.Response, error) {
 
 func (t *Connection) readPump() error {
 	defer func() {
+		t.logger.Info("readPump ending", "project_id", t.projectID)
 		t.conn.Close()
 		close(t.done)
 	}()
 
+	t.conn.SetReadDeadline(time.Now().Add(60 * time.Second))
+
 	t.conn.SetPongHandler(func(string) error {
+		t.logger.Debug("received pong")
 		return t.conn.SetReadDeadline(time.Now().Add(60 * time.Second))
 	})
 
@@ -130,11 +142,16 @@ func (t *Connection) readPump() error {
 			if websocket.IsUnexpectedCloseError(err,
 				websocket.CloseGoingAway,
 				websocket.CloseAbnormalClosure) {
-				t.logger.Error("websocket error", "error", err)
-				return fmt.Errorf("websocket error: %w", err)
+				t.logger.Error("websocket read error", "error", err)
+				return fmt.Errorf("websocket read error: %w", err)
 			}
+			t.logger.Info("websocket closed normally")
 			return nil
 		}
+
+		t.logger.Info("received message",
+			"type", msg.Type,
+			"request_id", msg.RequestID)
 
 		switch msg.Type {
 		case "response":
