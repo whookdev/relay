@@ -63,7 +63,7 @@ func New(cfg *config.Config, logger *slog.Logger) (*Server, error) {
 func (s *Server) routes() http.Handler {
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("/", s.handleRequest)
+	mux.HandleFunc("/", s.handleProxyRequest)
 
 	return mux
 }
@@ -77,18 +77,18 @@ func (s *Server) wsRoutes() http.Handler {
 }
 
 func (s *Server) handleTunnelConnection(w http.ResponseWriter, r *http.Request) {
-	projectID := r.URL.Query().Get("project")
-	if projectID == "" {
-		http.Error(w, "Missing project ID", http.StatusBadRequest)
-		return
-	}
-
 	conn, err := s.upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		s.logger.Error("failed to upgrade websocket connection", "error", err)
 		return
 	}
 	defer conn.Close()
+
+	projectID := r.URL.Query().Get("project")
+	if projectID == "" {
+		http.Error(w, "Missing project ID", http.StatusBadRequest)
+		return
+	}
 
 	tunnelConn := tunnel.NewConnection(projectID, conn)
 
@@ -119,6 +119,8 @@ func (s *Server) handleProxyRequest(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "no project id specified", http.StatusBadRequest)
 		return
 	}
+
+	s.logger.Info("attempting to forward request", "project_id", projectID)
 
 	s.tunnelsMux.Lock()
 	tunnel, exists := s.tunnels[projectID]
@@ -186,7 +188,7 @@ func (s *Server) Start(ctx context.Context) error {
 	}()
 
 	go func() {
-		s.logger.Info("starting WebSocket server", "address", s.httpServer.Addr)
+		s.logger.Info("starting WebSocket server", "address", s.wsServer.Addr)
 		if err := s.wsServer.ListenAndServe(); err != http.ErrServerClosed {
 			s.logger.Error("WebSocket server error", "error", err)
 		}
